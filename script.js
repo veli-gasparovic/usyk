@@ -285,14 +285,50 @@ class BoxingRecordsChart {
             .curve(d3.curveLinear);
 
         this.processedData.forEach(boxerData => {
-            // Add main line
+            // Add main line with random opacity
+            const randomOpacity = 0.05 + Math.random() * 0.3; // Random between 0.05 and 0.35
+            boxerData.originalOpacity = randomOpacity; // Store original opacity for hover reset
             g.append("path")
                 .datum(boxerData.points)
                 .attr("class", "line")
                 .attr("d", line)
-                .style("stroke", boxerData.color)
+                .style("stroke", "white")
                 .style("stroke-width", 2)
-                .style("opacity", 0.8);
+                .style("opacity", randomOpacity);
+
+            // Add colored segment for Usyk fight
+            const usykFightIndex = boxerData.points.findIndex(point => point.fight.opponent === "Oleksandr Usyk");
+            if (usykFightIndex !== -1) {
+                // Always highlight the segment TO the Usyk fight point (showing the loss)
+                if (usykFightIndex > 0) {
+                    const usykSegment = [
+                        boxerData.points[usykFightIndex - 1],
+                        boxerData.points[usykFightIndex]
+                    ];
+                    
+                    g.append("path")
+                        .datum(usykSegment)
+                        .attr("class", "usyk-fight-segment")
+                        .attr("d", line)
+                        .style("stroke", boxerData.color)
+                        .style("stroke-width", 3)
+                        .style("opacity", 1);
+                } else if (usykFightIndex === 0 && boxerData.points.length > 1) {
+                    // If Usyk fight is the first fight, highlight the segment from it to the next
+                    const usykSegment = [
+                        boxerData.points[0],
+                        boxerData.points[1]
+                    ];
+                    
+                    g.append("path")
+                        .datum(usykSegment)
+                        .attr("class", "usyk-fight-segment")
+                        .attr("d", line)
+                        .style("stroke", boxerData.color)
+                        .style("stroke-width", 3)
+                        .style("opacity", 1);
+                }
+            }
         });
     }
 
@@ -309,8 +345,9 @@ class BoxingRecordsChart {
             .attr("y", 0)
             .attr("width", segmentWidth)
             .attr("height", this.height)
-            .style("fill", "#FFD700")
-            .style("opacity", 0.3)
+            // .style("fill", "#FFD700")
+            .style("fill", "white")
+            .style("opacity", 0.2)
             .style("mix-blend-mode", "color-dodge");
     }
 
@@ -347,13 +384,16 @@ class BoxingRecordsChart {
                             return d[0].boxer === boxerData.boxer ? 1 : 0.2;
                         })
                         .style("stroke-width", d => {
-                            return d[0].boxer === boxerData.boxer ? 4 : 2;
+                            return d[0].boxer === boxerData.boxer ? 2 : 1;
                         });
                 })
                 .on("mouseout", () => {
-                    // Reset all lines to normal
+                    // Reset all lines to their original opacity
                     g.selectAll(".line")
-                        .style("opacity", 0.8)
+                        .style("opacity", d => {
+                            const fighterData = this.processedData.find(pd => pd.boxer === d[0].boxer);
+                            return fighterData ? fighterData.originalOpacity : 0.3;
+                        })
                         .style("stroke-width", 2);
                 });
         });
