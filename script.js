@@ -245,7 +245,7 @@ class BoxingRecordsChart {
       .style("font-size", "24px")
       .style("font-weight", "bold")
       .style("fill", "#ffd700")
-      .text("Facing the Usyk filter");
+      .text("Facing the Usyk Filter");
 
     // Add subtitle
     this.svg
@@ -325,7 +325,7 @@ class BoxingRecordsChart {
 
     this.processedData.forEach((boxerData) => {
       // Add main line with random opacity
-      const randomOpacity = 0.05 + Math.random() * 0.35; // Random between 0.05 and 0.4
+      const randomOpacity = 0.05 + Math.random() * 0.15; // Random between 0.05 and 0.4
       boxerData.originalOpacity = randomOpacity; // Store original opacity for hover reset
       g.append("path")
         .datum(boxerData.points)
