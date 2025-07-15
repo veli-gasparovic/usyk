@@ -190,6 +190,9 @@ class BoxingRecordsChart {
         // Add lines
         this.addLines(g);
         
+        // Add Usyk fight vertical bar
+        this.addUsykBar(g);
+        
         // Add legend
         this.addLegend(g);
     }
@@ -276,41 +279,24 @@ class BoxingRecordsChart {
                 .style("stroke", boxerData.color)
                 .style("stroke-width", 2)
                 .style("opacity", 0.8);
-
-            // Find the Usyk fight segment and highlight it
-            const usykFightIndex = boxerData.points.findIndex(point => point.fight.opponent === "Oleksandr Usyk");
-            if (usykFightIndex !== -1) {
-                // Always highlight the segment TO the Usyk fight point (showing the loss)
-                if (usykFightIndex > 0) {
-                    const usykSegment = [
-                        boxerData.points[usykFightIndex - 1],
-                        boxerData.points[usykFightIndex]
-                    ];
-                    
-                    g.append("path")
-                        .datum(usykSegment)
-                        .attr("class", "usyk-fight-segment")
-                        .attr("d", line)
-                        .style("stroke", "#FFD700")
-                        .style("stroke-width", 6)
-                        .style("opacity", 0.4);
-                } else if (usykFightIndex === 0 && boxerData.points.length > 1) {
-                    // If Usyk fight is the first fight, highlight the segment from it to the next
-                    const usykSegment = [
-                        boxerData.points[0],
-                        boxerData.points[1]
-                    ];
-                    
-                    g.append("path")
-                        .datum(usykSegment)
-                        .attr("class", "usyk-fight-segment")
-                        .attr("d", line)
-                        .style("stroke", "#FFD700")
-                        .style("stroke-width", 6)
-                        .style("opacity", 0.4);
-                }
-            }
         });
+    }
+
+    addUsykBar(g) {
+        // Define the fixed X position for all Usyk fights
+        const USYK_FIGHT_X = 15;
+        
+        // Calculate the width of one segment based on the x-scale
+        const segmentWidth = this.xScale(1) - this.xScale(0); // Width of one fight unit
+        const barX = this.xScale(USYK_FIGHT_X) - segmentWidth;
+        
+        g.append("rect")
+            .attr("x", barX)
+            .attr("y", 0)
+            .attr("width", segmentWidth)
+            .attr("height", this.height)
+            .style("fill", "#FFD700")
+            .style("opacity", 0.3);
     }
 
     addLegend(g) {
