@@ -1,3 +1,6 @@
+// Initialize Mixpanel
+mixpanel.init("af7a3b5acec336f429aba394a5ad602c");
+
 class BoxingRecordsChart {
   constructor() {
     this.margin = { top: 80, right: 10, bottom: 60, left: 10 };
@@ -40,8 +43,21 @@ class BoxingRecordsChart {
       this.data = await this.loadCSVData("bouts.csv");
       this.processData();
       this.render();
+
+      // Track successful data load
+      mixpanel.track("Data Loaded Successfully", {
+        dataSource: "CSV",
+        fightersCount: this.data.length,
+      });
     } catch (error) {
       console.error("Error loading data:", error);
+
+      // Track data loading failure
+      mixpanel.track("Data Load Failed", {
+        error: error.message,
+        fallbackToSample: true,
+      });
+
       // Fall back to sample data if CSV loading fails
       this.data = this.generateSampleData();
       this.processData();
@@ -451,6 +467,13 @@ class BoxingRecordsChart {
       // Add hover functionality
       legendRow
         .on("mouseover", () => {
+          console.log("Fighter Hovered", boxerData.boxer);
+          // Track fighter hover
+          mixpanel.track("Fighter Hovered", {
+            fighterName: boxerData.boxer,
+            timestamp: new Date().toISOString(),
+          });
+
           // Highlight only the associated line
           g.selectAll(".line")
             .filter((d) => d[0].boxer === boxerData.boxer)
@@ -543,5 +566,11 @@ class BoxingRecordsChart {
 
 // Initialize the chart when the page loads
 document.addEventListener("DOMContentLoaded", () => {
+  // Track page load
+  mixpanel.track("Page Loaded", {
+    page: "Boxing Records Visualization",
+    timestamp: new Date().toISOString(),
+  });
+
   window.chart = new BoxingRecordsChart();
 });
