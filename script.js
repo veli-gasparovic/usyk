@@ -282,6 +282,8 @@ class BoxingRecordsChart {
       .style("font-size", "16px")
       .style("fill", "#cccccc")
       .text("The vertical bar represents their first fight with Usyk");
+
+
   }
 
   addYAxis(g) {
@@ -427,6 +429,27 @@ class BoxingRecordsChart {
       .style("font-weight", "bold")
       .style("opacity", 0.7)
       .text("Filter");
+
+    // Add author attribution at bottom of bar
+    g.append("text")
+      .attr("x", textX)
+      .attr("y", this.height - 25) // First line at bottom
+      .attr("text-anchor", "start")
+      .style("fill", "#ffffff")
+      .style("font-size", "12px")
+      .style("font-weight", "bold")
+      .style("opacity", 0.2)
+      .text("Author:");
+
+    g.append("text")
+      .attr("x", textX)
+      .attr("y", this.height - 10) // Second line below first
+      .attr("text-anchor", "start")
+      .style("fill", "#ffffff")
+      .style("font-size", "12px")
+      .style("font-weight", "bold")
+      .style("opacity", 0.2)
+      .text("@velimirgasp");
   }
 
   addLegend(g) {
