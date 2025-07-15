@@ -296,7 +296,8 @@ class BoxingRecordsChart {
             .attr("width", segmentWidth)
             .attr("height", this.height)
             .style("fill", "#FFD700")
-            .style("opacity", 0.3);
+            .style("opacity", 0.3)
+            .style("mix-blend-mode", "color-dodge");
     }
 
     addLegend(g) {
