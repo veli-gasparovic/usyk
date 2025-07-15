@@ -97,10 +97,44 @@ class BoxingRecordsChart {
         // Define a fixed X position for all Usyk fights (e.g., middle of the chart)
         const USYK_FIGHT_X = 15; // Fixed X position for alignment
         
-        this.processedData = this.data.filter(boxerData => boxerData.boxer !== "Oleksandr Usyk").map(boxerData => {
+        // Filter out Usyk and calculate where each fighter's Usyk fight would be
+        const fightersWithUsyk = this.data.filter(boxerData => 
+            boxerData.boxer !== "Oleksandr Usyk" && 
+            boxerData.fights.some(fight => fight.opponent === "Oleksandr Usyk")
+        );
+        
+        // First pass: calculate each fighter's record at their Usyk fight
+        const fightersWithUsykPositions = fightersWithUsyk.map(boxerData => {
             const fights = boxerData.fights;
-            // Add random jitter to starting position to prevent overlap
-            let cumulativeRecord = (Math.random() - 0.5) * 4; // Random jitter between -2 and +2
+            const usykFightIndex = fights.findIndex(fight => fight.opponent === "Oleksandr Usyk");
+            
+            // Calculate cumulative record up to (but not including) Usyk fight
+            let recordAtUsyk = 0;
+            for (let i = 0; i < usykFightIndex; i++) {
+                const fight = fights[i];
+                if (fight.result === "Win") recordAtUsyk += 1;
+                else if (fight.result === "Loss") recordAtUsyk -= 1;
+            }
+            
+            return {
+                ...boxerData,
+                usykFightIndex,
+                recordAtUsyk
+            };
+        });
+        
+        // Now create uniform spacing for the Usyk segments
+        const spacing = 2; // Vertical spacing between Usyk segments
+        const totalHeight = (fightersWithUsyk.length - 1) * spacing;
+        const baseUsykY = -totalHeight / 2;
+        
+        this.processedData = fightersWithUsykPositions.map((boxerData, index) => {
+            const fights = boxerData.fights;
+            const targetUsykY = baseUsykY + index * spacing;
+            
+            // Calculate starting position to achieve target Usyk Y position
+            const startingY = targetUsykY - boxerData.recordAtUsyk;
+            let cumulativeRecord = startingY;
             const points = [];
             
             // Find when this boxer fought Usyk (if they did)
@@ -276,7 +310,7 @@ class BoxingRecordsChart {
 
         this.processedData.forEach(boxerData => {
             // Add main line with random opacity
-            const randomOpacity = 0.05 + Math.random() * 0.3; // Random between 0.05 and 0.35
+            const randomOpacity = 0.05 + Math.random() * 0.35; // Random between 0.05 and 0.4
             boxerData.originalOpacity = randomOpacity; // Store original opacity for hover reset
             g.append("path")
                 .datum(boxerData.points)
@@ -368,11 +402,11 @@ class BoxingRecordsChart {
     addLegend(g) {
         const legend = g.append("g")
             .attr("class", "legend")
-            .attr("transform", `translate(${Math.max(this.width - 150, 10)}, 20)`);
+            .attr("transform", `translate(${Math.max(this.width - 150, 10)}, ${this.height - 20})`);
 
         this.processedData.forEach((boxerData, i) => {
             const legendRow = legend.append("g")
-                .attr("transform", `translate(0, ${i * 24})`)
+                .attr("transform", `translate(0, ${-i * 24})`)
                 .style("cursor", "pointer");
 
             legendRow.append("line")
@@ -396,23 +430,26 @@ class BoxingRecordsChart {
             // Add hover functionality
             legendRow
                 .on("mouseover", () => {
-                    // Highlight the associated line
+                    // Highlight only the associated line
                     g.selectAll(".line")
-                        .style("opacity", d => {
-                            return d[0].boxer === boxerData.boxer ? 1 : 0.2;
-                        })
-                        .style("stroke-width", d => {
-                            return d[0].boxer === boxerData.boxer ? 2 : 1;
-                        });
+                        .filter(d => d[0].boxer === boxerData.boxer)
+                        .style("opacity", 1)
+                        .style("stroke-width", 2);
+                    
+                    // Underline the fighter name
+                    legendRow.select("text")
+                        .style("text-decoration", "underline");
                 })
                 .on("mouseout", () => {
-                    // Reset all lines to their original opacity
+                    // Reset only the associated line
                     g.selectAll(".line")
-                        .style("opacity", d => {
-                            const fighterData = this.processedData.find(pd => pd.boxer === d[0].boxer);
-                            return fighterData ? fighterData.originalOpacity : 0.3;
-                        })
+                        .filter(d => d[0].boxer === boxerData.boxer)
+                        .style("opacity", boxerData.originalOpacity)
                         .style("stroke-width", 2);
+                    
+                    // Remove underline from fighter name
+                    legendRow.select("text")
+                        .style("text-decoration", "none");
                 });
         });
     }
