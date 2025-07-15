@@ -214,20 +214,10 @@ class BoxingRecordsChart {
     }
 
     addYAxis(g) {
-        // Y axis
+        // Y axis with tick numbers but no label
         g.append("g")
             .attr("class", "axis")
             .call(d3.axisLeft(this.yScale));
-        
-        // Y axis label
-        g.append("text")
-            .attr("transform", "rotate(-90)")
-            .attr("y", 0 - this.margin.left)
-            .attr("x", 0 - (this.height / 2))
-            .attr("dy", "1em")
-            .style("text-anchor", "middle")
-            .style("fill", "#ffffff")
-            .text("Cumulative Record (+1 Win, -1 Loss, 0 Draw)");
     }
 
     addGrid(g) {
@@ -339,6 +329,7 @@ class BoxingRecordsChart {
         // Calculate the width of one segment based on the x-scale
         const segmentWidth = this.xScale(1) - this.xScale(0); // Width of one fight unit
         const barX = this.xScale(USYK_FIGHT_X) - segmentWidth;
+        const barCenterX = barX + segmentWidth / 2;
         
         g.append("rect")
             .attr("x", barX)
@@ -349,6 +340,29 @@ class BoxingRecordsChart {
             .style("fill", "white")
             .style("opacity", 0.2)
             .style("mix-blend-mode", "color-dodge");
+        
+        // Add text label to the right of the bar
+        const textX = barX + segmentWidth + 10; // 10px to the right of the bar
+        
+        g.append("text")
+            .attr("x", textX)
+            .attr("y", 15) // First line at top level
+            .attr("text-anchor", "start")
+            .style("fill", "#ffffff")
+            .style("font-size", "12px")
+            .style("font-weight", "bold")
+            .style("opacity", 0.7)
+            .text("Usyk");
+            
+        g.append("text")
+            .attr("x", textX)
+            .attr("y", 30) // Second line below first
+            .attr("text-anchor", "start")
+            .style("fill", "#ffffff")
+            .style("font-size", "12px")
+            .style("font-weight", "bold")
+            .style("opacity", 0.7)
+            .text("fight");
     }
 
     addLegend(g) {
@@ -358,16 +372,20 @@ class BoxingRecordsChart {
 
         this.processedData.forEach((boxerData, i) => {
             const legendRow = legend.append("g")
-                .attr("transform", `translate(0, ${i * 20})`)
+                .attr("transform", `translate(0, ${i * 24})`)
                 .style("cursor", "pointer");
 
-            legendRow.append("rect")
-                .attr("width", 18)
-                .attr("height", 18)
-                .style("fill", boxerData.color);
+            legendRow.append("line")
+                .attr("x1", 0)
+                .attr("y1", 3)
+                .attr("x2", 18)
+                .attr("y2", 15)
+                .style("stroke", boxerData.color)
+                .style("stroke-width", 3)
+                .style("opacity", 1);
 
             legendRow.append("text")
-                .attr("x", 24)
+                .attr("x", 22)
                 .attr("y", 9)
                 .attr("dy", "0.35em")
                 .style("fill", "#ffffff")
