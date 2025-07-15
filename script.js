@@ -1,6 +1,6 @@
 class BoxingRecordsChart {
     constructor() {
-        this.margin = { top: 40, right: 60, bottom: 60, left: 60 };
+        this.margin = { top: 80, right: 60, bottom: 60, left: 60 };
         this.svg = d3.select("#chart");
         this.tooltip = this.createTooltip();
         this.colorScale = d3.scaleOrdinal(d3.schemeCategory10);
@@ -38,13 +38,13 @@ class BoxingRecordsChart {
 
     async loadData() {
         try {
-            // For now, create sample data. Replace with actual CSV loading later
-            this.data = this.generateSampleData();
+            // Load actual CSV data
+            this.data = await this.loadCSVData('bouts.csv');
             this.processData();
             this.render();
         } catch (error) {
             console.error("Error loading data:", error);
-            // Show error message or create sample data
+            // Fall back to sample data if CSV loading fails
             this.data = this.generateSampleData();
             this.processData();
             this.render();
@@ -89,10 +89,18 @@ class BoxingRecordsChart {
     processData() {
         // Find Usyk's data
         const usykData = this.data.find(boxer => boxer.boxer === "Oleksandr Usyk");
+        if (!usykData) {
+            console.error("Usyk data not found!");
+            return;
+        }
         
-        this.processedData = this.data.map(boxerData => {
+        // Define a fixed X position for all Usyk fights (e.g., middle of the chart)
+        const USYK_FIGHT_X = 15; // Fixed X position for alignment
+        
+        this.processedData = this.data.filter(boxerData => boxerData.boxer !== "Oleksandr Usyk").map(boxerData => {
             const fights = boxerData.fights;
-            let cumulativeRecord = 0;
+            // Add random jitter to starting position to prevent overlap
+            let cumulativeRecord = (Math.random() - 0.5) * 4; // Random jitter between -2 and +2
             const points = [];
             
             // Find when this boxer fought Usyk (if they did)
@@ -105,15 +113,30 @@ class BoxingRecordsChart {
             }
             
             fights.forEach((fight, index) => {
-                // Adjust starting point so Usyk fights align
                 let adjustedIndex = index;
-                if (boxerData.boxer !== "Oleksandr Usyk" && usykFightIndex !== -1) {
-                    // Align this boxer's Usyk fight with Usyk's corresponding fight
-                    const usykFightWithThisBoxer = usykData.fights.find(f => f.opponent === boxerData.boxer);
-                    if (usykFightWithThisBoxer) {
-                        const usykFightPosition = usykData.fights.findIndex(f => f.opponent === boxerData.boxer);
-                        adjustedIndex = index - usykFightIndex + usykFightPosition;
+                
+                // For Usyk himself, align his fights with opponents at the fixed X position
+                if (boxerData.boxer === "Oleksandr Usyk") {
+                    // Find if this fight is against someone in our data
+                    const opponentData = this.data.find(d => d.boxer === fight.opponent);
+                    if (opponentData) {
+                        adjustedIndex = USYK_FIGHT_X;
+                    } else {
+                        // For other fights, use sequential numbering
+                        adjustedIndex = index;
                     }
+                } else if (usykFightIndex !== -1) {
+                    // For other boxers, align their Usyk fight with the fixed X position
+                    adjustedIndex = index - usykFightIndex + USYK_FIGHT_X;
+                }
+                
+                // Update cumulative record based on actual result values BEFORE adding the point
+                if (fight.result === "Win") {
+                    cumulativeRecord += 1;
+                } else if (fight.result === "Loss") {
+                    cumulativeRecord -= 1;
+                } else if (fight.result === "Draw") {
+                    // Draw stays the same (no change to cumulativeRecord)
                 }
                 
                 points.push({
@@ -122,14 +145,6 @@ class BoxingRecordsChart {
                     fight: fight,
                     boxer: boxerData.boxer
                 });
-                
-                // Update cumulative record
-                if (fight.result === "W") {
-                    cumulativeRecord += 1;
-                } else if (fight.result === "L") {
-                    cumulativeRecord -= 1;
-                }
-                // Draw stays the same (no change to cumulativeRecord)
             });
             
             return {
@@ -142,6 +157,9 @@ class BoxingRecordsChart {
 
     render() {
         this.svg.selectAll("*").remove();
+        
+        // Add title
+        this.addTitle();
         
         const g = this.svg
             .append("g")
@@ -174,6 +192,25 @@ class BoxingRecordsChart {
         
         // Add legend
         this.addLegend(g);
+    }
+
+    addTitle() {
+        // Add main title
+        this.svg.append("text")
+            .attr("x", this.margin.left)
+            .attr("y", 30)
+            .style("font-size", "24px")
+            .style("font-weight", "bold")
+            .style("fill", "#ffd700")
+            .text("Oleksandr Usyk Boxing Records");
+            
+        // Add subtitle
+        this.svg.append("text")
+            .attr("x", this.margin.left)
+            .attr("y", 55)
+            .style("font-size", "16px")
+            .style("fill", "#cccccc")
+            .text("Career Progression vs Opponents");
     }
 
     addGrid(g) {
@@ -228,32 +265,51 @@ class BoxingRecordsChart {
         const line = d3.line()
             .x(d => this.xScale(d.x))
             .y(d => this.yScale(d.y))
-            .curve(d3.curveStepAfter);
+            .curve(d3.curveLinear);
 
         this.processedData.forEach(boxerData => {
-            // Add line
+            // Add main line
             g.append("path")
                 .datum(boxerData.points)
                 .attr("class", "line")
                 .attr("d", line)
                 .style("stroke", boxerData.color)
-                .style("stroke-width", boxerData.boxer === "Oleksandr Usyk" ? 3 : 2)
-                .style("opacity", boxerData.boxer === "Oleksandr Usyk" ? 1 : 0.8);
+                .style("stroke-width", 2)
+                .style("opacity", 0.8);
 
-            // Add points
-            g.selectAll(`.point-${boxerData.boxer.replace(/\s+/g, '')}`)
-                .data(boxerData.points)
-                .enter()
-                .append("circle")
-                .attr("class", `point-${boxerData.boxer.replace(/\s+/g, '')}`)
-                .attr("cx", d => this.xScale(d.x))
-                .attr("cy", d => this.yScale(d.y))
-                .attr("r", 4)
-                .style("fill", boxerData.color)
-                .style("stroke", "#ffffff")
-                .style("stroke-width", 1)
-                .on("mouseover", (event, d) => this.showTooltip(event, d))
-                .on("mouseout", () => this.hideTooltip());
+            // Find the Usyk fight segment and highlight it
+            const usykFightIndex = boxerData.points.findIndex(point => point.fight.opponent === "Oleksandr Usyk");
+            if (usykFightIndex !== -1) {
+                // Always highlight the segment TO the Usyk fight point (showing the loss)
+                if (usykFightIndex > 0) {
+                    const usykSegment = [
+                        boxerData.points[usykFightIndex - 1],
+                        boxerData.points[usykFightIndex]
+                    ];
+                    
+                    g.append("path")
+                        .datum(usykSegment)
+                        .attr("class", "usyk-fight-segment")
+                        .attr("d", line)
+                        .style("stroke", "#FFD700")
+                        .style("stroke-width", 6)
+                        .style("opacity", 0.4);
+                } else if (usykFightIndex === 0 && boxerData.points.length > 1) {
+                    // If Usyk fight is the first fight, highlight the segment from it to the next
+                    const usykSegment = [
+                        boxerData.points[0],
+                        boxerData.points[1]
+                    ];
+                    
+                    g.append("path")
+                        .datum(usykSegment)
+                        .attr("class", "usyk-fight-segment")
+                        .attr("d", line)
+                        .style("stroke", "#FFD700")
+                        .style("stroke-width", 6)
+                        .style("opacity", 0.4);
+                }
+            }
         });
     }
 
@@ -288,6 +344,8 @@ class BoxingRecordsChart {
                 <strong>${d.boxer}</strong><br/>
                 Fight ${d.x + 1}: vs ${d.fight.opponent}<br/>
                 Result: ${d.fight.result}<br/>
+                Method: ${d.fight.method}<br/>
+                Date: ${d.fight.date}<br/>
                 Cumulative: ${d.y > 0 ? '+' : ''}${d.y}
             `)
             .style("left", (event.pageX + 10) + "px")
@@ -300,34 +358,46 @@ class BoxingRecordsChart {
 
     // Method to load actual CSV data
     async loadCSVData(csvFile) {
-        try {
-            const data = await d3.csv(csvFile);
-            // Process CSV data into the expected format
-            this.data = this.processCSVData(data);
-            this.processData();
-            this.render();
-        } catch (error) {
-            console.error("Error loading CSV:", error);
-        }
+        const data = await d3.csv(csvFile);
+        return this.processCSVData(data);
     }
 
     processCSVData(csvData) {
-        // This method will process the actual CSV data
-        // Expected CSV format: boxer, opponent, result, fight_number
+        // Process the actual CSV data
+        // CSV format: "Opponent 1,Opponent 2,Result,Method,Date"
         const boxerMap = new Map();
         
-        csvData.forEach(row => {
-            const boxer = row.boxer;
+        csvData.forEach((row, index) => {
+            const boxer = row["Opponent 1"];
+            const opponent = row["Opponent 2"];
+            const result = row["Result"];
+            const method = row["Method"];
+            const date = row["Date"];
+            
+            // Skip invalid rows
+            if (!boxer || !opponent || !result) return;
+            
             if (!boxerMap.has(boxer)) {
                 boxerMap.set(boxer, { boxer: boxer, fights: [] });
             }
             
             boxerMap.get(boxer).fights.push({
-                opponent: row.opponent,
-                result: row.result,
-                fightNumber: +row.fight_number
+                opponent: opponent,
+                result: result,
+                method: method,
+                date: date,
+                fightNumber: boxerMap.get(boxer).fights.length + 1
             });
         });
+        
+        // Sort fights by date for each boxer to ensure chronological order
+        for (const [boxer, data] of boxerMap) {
+            data.fights.sort((a, b) => new Date(a.date) - new Date(b.date));
+            // Reassign fight numbers after sorting
+            data.fights.forEach((fight, index) => {
+                fight.fightNumber = index + 1;
+            });
+        }
         
         return Array.from(boxerMap.values());
     }
@@ -337,10 +407,3 @@ class BoxingRecordsChart {
 document.addEventListener('DOMContentLoaded', () => {
     window.chart = new BoxingRecordsChart();
 });
-
-// Function to load CSV data (call this when you have the CSV file)
-function loadCSV(filename) {
-    if (window.chart) {
-        window.chart.loadCSVData(filename);
-    }
-}
