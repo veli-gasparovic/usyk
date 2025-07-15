@@ -181,11 +181,8 @@ class BoxingRecordsChart {
             .domain([yExtent[0] - yPadding, yExtent[1] + yPadding])
             .range([this.height, 0]);
 
-        // Add grid
-        this.addGrid(g);
-        
-        // Add axes
-        this.addAxes(g);
+        // Add Y axis only
+        this.addYAxis(g);
         
         // Add lines
         this.addLines(g);
@@ -214,6 +211,23 @@ class BoxingRecordsChart {
             .style("font-size", "16px")
             .style("fill", "#cccccc")
             .text("Career Progression vs Opponents");
+    }
+
+    addYAxis(g) {
+        // Y axis
+        g.append("g")
+            .attr("class", "axis")
+            .call(d3.axisLeft(this.yScale));
+        
+        // Y axis label
+        g.append("text")
+            .attr("transform", "rotate(-90)")
+            .attr("y", 0 - this.margin.left)
+            .attr("x", 0 - (this.height / 2))
+            .attr("dy", "1em")
+            .style("text-anchor", "middle")
+            .style("fill", "#ffffff")
+            .text("Cumulative Record (+1 Win, -1 Loss, 0 Draw)");
     }
 
     addGrid(g) {
@@ -303,7 +317,7 @@ class BoxingRecordsChart {
     addLegend(g) {
         const legend = g.append("g")
             .attr("class", "legend")
-            .attr("transform", `translate(${this.width - 150}, 20)`);
+            .attr("transform", `translate(${Math.max(this.width - 150, 10)}, 20)`);
 
         this.processedData.forEach((boxerData, i) => {
             const legendRow = legend.append("g")
