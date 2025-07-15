@@ -3,7 +3,7 @@ mixpanel.init("af7a3b5acec336f429aba394a5ad602c");
 
 class BoxingRecordsChart {
   constructor() {
-    this.margin = { top: 80, right: 10, bottom: 60, left: 10 };
+    this.margin = { top: 80, right: 10, bottom: 60, left: 30 };
     this.svg = d3.select("#chart");
     this.tooltip = this.createTooltip();
     this.colorScale = d3.scaleOrdinal(d3.schemeCategory10);
@@ -257,7 +257,7 @@ class BoxingRecordsChart {
     this.svg
       .append("text")
       .attr("x", this.margin.left)
-      .attr("y", 30)
+      .attr("y", 50)
       .style("font-size", "24px")
       .style("font-weight", "bold")
       .style("fill", "#ffd700")
@@ -267,7 +267,7 @@ class BoxingRecordsChart {
     this.svg
       .append("text")
       .attr("x", this.margin.left)
-      .attr("y", 55)
+      .attr("y", 75)
       .style("font-size", "16px")
       .style("fill", "#cccccc")
       .text(
@@ -278,7 +278,7 @@ class BoxingRecordsChart {
     this.svg
       .append("text")
       .attr("x", this.margin.left)
-      .attr("y", 75)
+      .attr("y", 95)
       .style("font-size", "16px")
       .style("fill", "#cccccc")
       .text("The vertical bar represents their first fight with Usyk");
