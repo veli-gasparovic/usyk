@@ -306,7 +306,8 @@ class BoxingRecordsChart {
 
         this.processedData.forEach((boxerData, i) => {
             const legendRow = legend.append("g")
-                .attr("transform", `translate(0, ${i * 20})`);
+                .attr("transform", `translate(0, ${i * 20})`)
+                .style("cursor", "pointer");
 
             legendRow.append("rect")
                 .attr("width", 18)
@@ -319,7 +320,27 @@ class BoxingRecordsChart {
                 .attr("dy", "0.35em")
                 .style("fill", "#ffffff")
                 .style("font-size", "12px")
+                .style("opacity", 0.7)
                 .text(boxerData.boxer);
+
+            // Add hover functionality
+            legendRow
+                .on("mouseover", () => {
+                    // Highlight the associated line
+                    g.selectAll(".line")
+                        .style("opacity", d => {
+                            return d[0].boxer === boxerData.boxer ? 1 : 0.2;
+                        })
+                        .style("stroke-width", d => {
+                            return d[0].boxer === boxerData.boxer ? 4 : 2;
+                        });
+                })
+                .on("mouseout", () => {
+                    // Reset all lines to normal
+                    g.selectAll(".line")
+                        .style("opacity", 0.8)
+                        .style("stroke-width", 2);
+                });
         });
     }
 
