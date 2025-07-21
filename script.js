@@ -145,7 +145,7 @@ class BoxingRecordsChart {
             usykFightIndex: index,
             recordAtUsyk,
             originalBoxer: boxerData.boxer, // Store original name for color mapping
-            boxer: totalUsykFights > 1 ? `${boxerData.boxer} (Fight ${usykFightNumber})` : boxerData.boxer,
+            boxer: totalUsykFights > 1 ? `${boxerData.boxer} (${usykFightNumber})` : boxerData.boxer,
             usykFightDate: fight.date, // Store the date of this specific Usyk fight for sorting
           });
         }
@@ -345,7 +345,7 @@ class BoxingRecordsChart {
         .attr("d", line)
         .style("stroke", "white")
         .style("stroke-width", 2)
-        .style("opacity", randomOpacity);
+        .style("opacity", randomOpacity)        
 
       // Add colored segment for Usyk fight  
       // Find the point that is marked as the Usyk fight for this specific trajectory
