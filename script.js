@@ -38,31 +38,17 @@ class BoxingRecordsChart {
   }
 
   async loadData() {
-    try {
-      // Load actual CSV data
-      this.data = await this.loadCSVData("bouts.csv");
-      this.processData();
-      this.render();
+    // Load actual CSV data
+    this.data = await this.loadCSVData("bouts.csv");
+    console.log("Loaded data:", this.data);
+    this.processData();
+    this.render();
 
-      // Track successful data load
-      mixpanel.track("Data Loaded Successfully", {
-        dataSource: "CSV",
-        fightersCount: this.data.length,
-      });
-    } catch (error) {
-      console.error("Error loading data:", error);
-
-      // Track data loading failure
-      mixpanel.track("Data Load Failed", {
-        error: error.message,
-        fallbackToSample: true,
-      });
-
-      // Fall back to sample data if CSV loading fails
-      this.data = this.generateSampleData();
-      this.processData();
-      this.render();
-    }
+    // Track successful data load
+    mixpanel.track("Data Loaded Successfully", {
+      dataSource: "CSV",
+      fightersCount: this.data.length,
+    });
   }
 
   generateSampleData() {
@@ -75,7 +61,8 @@ class BoxingRecordsChart {
           { opponent: "Opponent2", result: "W", fightNumber: 2 },
           { opponent: "Opponent3", result: "W", fightNumber: 3 },
           { opponent: "Anthony Joshua", result: "W", fightNumber: 4 },
-          { opponent: "Tyson Fury", result: "W", fightNumber: 5 },
+          { opponent: "Anthony Joshua", result: "W", fightNumber: 5 },
+          { opponent: "Tyson Fury", result: "W", fightNumber: 6 },
         ],
       },
       {
@@ -83,8 +70,12 @@ class BoxingRecordsChart {
         fights: [
           { opponent: "Fighter1", result: "W", fightNumber: 1 },
           { opponent: "Fighter2", result: "W", fightNumber: 2 },
-          { opponent: "Oleksandr Usyk", result: "L", fightNumber: 3 },
-          { opponent: "Fighter4", result: "W", fightNumber: 4 },
+          { opponent: "Fighter3", result: "W", fightNumber: 3 },
+          { opponent: "Oleksandr Usyk", result: "L", fightNumber: 4 },
+          { opponent: "Fighter5", result: "W", fightNumber: 5 },
+          { opponent: "Fighter6", result: "W", fightNumber: 6 },
+          { opponent: "Oleksandr Usyk", result: "L", fightNumber: 7 },
+          { opponent: "Fighter8", result: "W", fightNumber: 8 },
         ],
       },
       {
@@ -120,31 +111,44 @@ class BoxingRecordsChart {
         boxerData.fights.some((fight) => fight.opponent === "Oleksandr Usyk")
     );
 
-    // First pass: calculate each fighter's record at their Usyk fight
-    const fightersWithUsykPositions = fightersWithUsyk.map((boxerData) => {
+    // First pass: calculate each fighter's record at EACH Usyk fight (create multiple trajectories)
+    const fightersWithUsykPositions = [];
+    
+    fightersWithUsyk.forEach((boxerData) => {
       const fights = boxerData.fights;
-      const usykFightIndex = fights.findIndex(
-        (fight) => fight.opponent === "Oleksandr Usyk"
-      );
+      
+      // Find ALL Usyk fights for this boxer
+      fights.forEach((fight, index) => {
+        if (fight.opponent === "Oleksandr Usyk") {
+          // Calculate cumulative record up to (but not including) this specific Usyk fight
+          let recordAtUsyk = 0;
+          for (let i = 0; i < index; i++) {
+            const prevFight = fights[i];
+            if (prevFight.result === "Win" || prevFight.result === "W") recordAtUsyk += 1;
+            else if (prevFight.result === "Loss" || prevFight.result === "L") recordAtUsyk -= 1;
+          }
 
-      // Calculate cumulative record up to (but not including) Usyk fight
-      let recordAtUsyk = 0;
-      for (let i = 0; i < usykFightIndex; i++) {
-        const fight = fights[i];
-        if (fight.result === "Win") recordAtUsyk += 1;
-        else if (fight.result === "Loss") recordAtUsyk -= 1;
-      }
-
-      return {
-        ...boxerData,
-        usykFightIndex,
-        recordAtUsyk,
-      };
+          // Count how many Usyk fights this boxer has had
+          const totalUsykFights = fights.filter(f => f.opponent === "Oleksandr Usyk").length;
+          const usykFightNumber = fights.slice(0, index + 1).filter(f => f.opponent === "Oleksandr Usyk").length;
+          
+          fightersWithUsykPositions.push({
+            ...boxerData,
+            usykFightIndex: index,
+            recordAtUsyk,
+            boxer: totalUsykFights > 1 ? `${boxerData.boxer} (Fight ${usykFightNumber})` : boxerData.boxer,
+            usykFightDate: fight.date, // Store the date of this specific Usyk fight for sorting
+          });
+        }
+      });
     });
+
+    // Sort all trajectories by the date of their respective Usyk fight
+    fightersWithUsykPositions.sort((a, b) => new Date(a.usykFightDate) - new Date(b.usykFightDate));
 
     // Now create uniform spacing for the Usyk segments
     const spacing = 2; // Vertical spacing between Usyk segments
-    const totalHeight = (fightersWithUsyk.length - 1) * spacing;
+    const totalHeight = (fightersWithUsykPositions.length - 1) * spacing;
     const baseUsykY = -totalHeight / 2;
 
     this.processedData = fightersWithUsykPositions.map((boxerData, index) => {
@@ -156,45 +160,24 @@ class BoxingRecordsChart {
       let cumulativeRecord = startingY;
       const points = [];
 
-      // Find when this boxer fought Usyk (if they did)
-      let usykFightIndex = -1;
-      if (boxerData.boxer !== "Oleksandr Usyk") {
-        const usykFight = fights.find(
-          (fight) => fight.opponent === "Oleksandr Usyk"
-        );
-        if (usykFight) {
-          usykFightIndex = fights.findIndex(
-            (fight) => fight.opponent === "Oleksandr Usyk"
-          );
-        }
-      }
+      // Use the specific Usyk fight index for this trajectory
+      const usykFightIndex = boxerData.usykFightIndex;
 
       fights.forEach((fight, index) => {
         let adjustedIndex = index;
 
-        // For Usyk himself, align his fights with opponents at the fixed X position
-        if (boxerData.boxer === "Oleksandr Usyk") {
-          // Find if this fight is against someone in our data
-          const opponentData = this.data.find(
-            (d) => d.boxer === fight.opponent
-          );
-          if (opponentData) {
-            adjustedIndex = USYK_FIGHT_X * 2; // Double the spacing
-          } else {
-            // For other fights, use sequential numbering with double spacing
-            adjustedIndex = index * 2;
-          }
-        } else if (usykFightIndex !== -1) {
-          // For other boxers, align their Usyk fight with the fixed X position
+        // For this trajectory, align the specific Usyk fight with the fixed X position
+        if (usykFightIndex !== -1) {
+          // Align the specific Usyk fight with the fixed X position
           adjustedIndex = (index - usykFightIndex + USYK_FIGHT_X) * 2; // Double the spacing
         }
 
         // Update cumulative record based on actual result values BEFORE adding the point
-        if (fight.result === "Win") {
+        if (fight.result === "Win" || fight.result === "W") {
           cumulativeRecord += 1;
-        } else if (fight.result === "Loss") {
+        } else if (fight.result === "Loss" || fight.result === "L") {
           cumulativeRecord -= 1;
-        } else if (fight.result === "Draw") {
+        } else if (fight.result === "Draw" || fight.result === "D") {
           // Draw stays the same (no change to cumulativeRecord)
         }
 
@@ -203,6 +186,7 @@ class BoxingRecordsChart {
           y: cumulativeRecord,
           fight: fight,
           boxer: boxerData.boxer,
+          isUsykFight: index === usykFightIndex, // Mark if this is the specific Usyk fight for this trajectory
         });
       });
 
@@ -353,9 +337,10 @@ class BoxingRecordsChart {
         .style("stroke-width", 2)
         .style("opacity", randomOpacity);
 
-      // Add colored segment for Usyk fight
+      // Add colored segment for Usyk fight  
+      // Find the point that is marked as the Usyk fight for this specific trajectory
       const usykFightIndex = boxerData.points.findIndex(
-        (point) => point.fight.opponent === "Oleksandr Usyk"
+        (point) => point.isUsykFight === true
       );
       if (usykFightIndex !== -1) {
         // Always highlight the segment TO the Usyk fight point (showing the loss)
@@ -458,13 +443,13 @@ class BoxingRecordsChart {
       .attr("class", "legend")
       .attr(
         "transform",
-        `translate(${Math.max(this.width - 150, 10)}, ${this.height - 20})`
+        `translate(${Math.max(this.width - 150, 10)}, 20)`
       );
 
-    this.processedData.forEach((boxerData, i) => {
+    this.processedData.slice().reverse().forEach((boxerData, i) => {
       const legendRow = legend
         .append("g")
-        .attr("transform", `translate(0, ${-i * 24})`)
+        .attr("transform", `translate(0, ${i * 24})`)
         .style("cursor", "pointer");
 
       legendRow
