@@ -290,7 +290,7 @@ class BoxingRecordsChart {
       .attr("y", 95)
       .style("font-size", "16px")
       .style("fill", "#cccccc")
-      .text("The vertical bar represents their first fight with Usyk");
+      .text("The vertical bar highlights their fight with Usyk. All lost.");
 
 
   }
