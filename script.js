@@ -111,6 +111,14 @@ class BoxingRecordsChart {
         boxerData.fights.some((fight) => fight.opponent === "Oleksandr Usyk")
     );
 
+    // Create color mapping for opponents - ensure same color for same opponent
+    this.opponentColorMap = new Map();
+    fightersWithUsyk.forEach((boxerData) => {
+      if (!this.opponentColorMap.has(boxerData.boxer)) {
+        this.opponentColorMap.set(boxerData.boxer, this.colorScale(boxerData.boxer));
+      }
+    });
+
     // First pass: calculate each fighter's record at EACH Usyk fight (create multiple trajectories)
     const fightersWithUsykPositions = [];
     
@@ -136,6 +144,7 @@ class BoxingRecordsChart {
             ...boxerData,
             usykFightIndex: index,
             recordAtUsyk,
+            originalBoxer: boxerData.boxer, // Store original name for color mapping
             boxer: totalUsykFights > 1 ? `${boxerData.boxer} (Fight ${usykFightNumber})` : boxerData.boxer,
             usykFightDate: fight.date, // Store the date of this specific Usyk fight for sorting
           });
@@ -192,8 +201,9 @@ class BoxingRecordsChart {
 
       return {
         boxer: boxerData.boxer,
+        originalBoxer: boxerData.originalBoxer, // Keep original boxer name 
         points: points,
-        color: this.colorScale(boxerData.boxer),
+        color: this.opponentColorMap.get(boxerData.originalBoxer), // Use color based on original name
       };
     });
   }
