@@ -7,6 +7,7 @@ class BoxingRecordsChart {
     this.svg = d3.select("#chart");
     this.tooltip = this.createTooltip();
     this.colorScale = d3.scaleOrdinal(d3.schemeCategory10);
+    this.verticalOrder = false; // Set to true for date-based vertical ordering, false for equal spacing
 
     this.init();
   }
@@ -155,14 +156,28 @@ class BoxingRecordsChart {
     // Sort all trajectories by the date of their respective Usyk fight
     fightersWithUsykPositions.sort((a, b) => new Date(a.usykFightDate) - new Date(b.usykFightDate));
 
-    // Now create uniform spacing for the Usyk segments
-    const spacing = 2; // Vertical spacing between Usyk segments
-    const totalHeight = (fightersWithUsykPositions.length - 1) * spacing;
-    const baseUsykY = -totalHeight / 2;
+    // Configure vertical positioning for the Usyk segments
+    let targetUsykYFunction;
+    
+    if (this.verticalOrder) {
+      // Date-based Y positioning
+      const allUsykDates = fightersWithUsykPositions.map(d => new Date(d.usykFightDate));
+      const dateExtent = d3.extent(allUsykDates);
+      const dateYScale = d3.scaleTime()
+        .domain(dateExtent)
+        .range([-20, 20]);
+      targetUsykYFunction = (boxerData) => dateYScale(new Date(boxerData.usykFightDate));
+    } else {
+      // Equal spacing
+      const spacing = 2; // Vertical spacing between Usyk segments
+      const totalHeight = (fightersWithUsykPositions.length - 1) * spacing;
+      const baseUsykY = -totalHeight / 2;
+      targetUsykYFunction = (boxerData, index) => baseUsykY + index * spacing;
+    }
 
     this.processedData = fightersWithUsykPositions.map((boxerData, index) => {
       const fights = boxerData.fights;
-      const targetUsykY = baseUsykY + index * spacing;
+      const targetUsykY = targetUsykYFunction(boxerData, index);
 
       // Calculate starting position to achieve target Usyk Y position
       const startingY = targetUsykY - boxerData.recordAtUsyk;
