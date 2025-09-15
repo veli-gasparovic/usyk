@@ -187,6 +187,18 @@ class BoxingRecordsChart {
       // Use the specific Crawford fight index for this trajectory
       const crawfordFightIndex = boxerData.crawfordFightIndex;
 
+      // If Crawford fight is the first fight (index 0), add a starting point at record 0
+      if (crawfordFightIndex === 0) {
+        const startingAdjustedIndex = (0 - crawfordFightIndex + CRAWFORD_FIGHT_X) * 2 - 2; // One position before
+        points.push({
+          x: startingAdjustedIndex,
+          y: cumulativeRecord,
+          fight: null, // No actual fight for this starting point
+          boxer: boxerData.boxer,
+          isCrawfordFight: false,
+        });
+      }
+
       fights.forEach((fight, index) => {
         let adjustedIndex = index;
 
