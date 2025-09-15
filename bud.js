@@ -160,7 +160,7 @@ class BoxingRecordsChart {
     // Each Crawford fight will be at a slightly different X position to create diagonal alignment
     let crawfordCumulativeWins = 0; // Crawford's cumulative wins counter
     const startingX = 5; // Start the Crawford line from the left
-    const fightSpacing = 1; // Small spacing between Crawford fights for diagonal alignment
+    const fightSpacing = 2.0; // Spacing between Crawford fights for diagonal alignment (100% longer segments)
     
     this.processedData = fightersWithCrawfordPositions.map((boxerData, index) => {
       const fights = boxerData.fights;
@@ -170,62 +170,47 @@ class BoxingRecordsChart {
       const crawfordFightY = -crawfordCumulativeWins; // Y level for this Crawford fight (negative for downward slope)
       crawfordCumulativeWins += 1; // Crawford wins, so his line goes down for the next fight
       
-      // Now we need to position this opponent's entire trajectory so their Crawford fight
-      // segment ends at the target X,Y position
-      const recordBeforeCrawford = boxerData.recordAtCrawford;
-      const startingY = crawfordFightY - recordBeforeCrawford;
-      let cumulativeRecord = startingY;
+      // Show the entire career record for each fighter
+      const startIndex = 0; // Start from the beginning of their career
+      const endIndex = fights.length; // Show all fights to the end of their career
       const points = [];
 
       // Use the specific Crawford fight index for this trajectory
       const crawfordFightIndex = boxerData.crawfordFightIndex;
-
-      // If Crawford fight is the first fight (index 0), add a starting point
-      if (crawfordFightIndex === 0) {
-        const startingAdjustedIndex = crawfordFightX - fightSpacing; // One position before Crawford fight
-        points.push({
-          x: startingAdjustedIndex,
-          y: cumulativeRecord,
-          fight: null, // No actual fight for this starting point
-          boxer: boxerData.boxer,
-          isCrawfordFight: false,
-        });
-      }
-
-      fights.forEach((fight, fightIndex) => {
+      
+      // Calculate the record at the Crawford fight to position it correctly
+      const recordAtCrawfordFight = boxerData.recordAtCrawford;
+      const startingY = crawfordFightY - recordAtCrawfordFight;
+      
+      for (let fightIndex = startIndex; fightIndex < endIndex; fightIndex++) {
+        const fight = fights[fightIndex];
         // Calculate X position relative to the Crawford fight position
         const relativeIndex = fightIndex - crawfordFightIndex;
         const adjustedIndex = crawfordFightX + (relativeIndex * fightSpacing); // Use fightSpacing for consistency
-
-        // Update cumulative record - maintain opponent's perspective throughout
-        if (fight.opponent === "Terence Crawford") {
-          // For Crawford fights, show opponent's loss (downward movement)
-          if (fight.result === "Win" || fight.result === "W") {
-            cumulativeRecord += 1; // Opponent wins against Crawford (rare case)
-          } else if (fight.result === "Loss" || fight.result === "L") {
-            cumulativeRecord -= 1; // Opponent loses to Crawford (common case)
-          } else if (fight.result === "Draw" || fight.result === "D") {
-            // Draw stays the same
-          }
-        } else {
-          // For non-Crawford fights, keep original opponent perspective
-          if (fight.result === "Win" || fight.result === "W") {
+        
+        // Calculate cumulative record up to this fight
+        let cumulativeRecord = 0;
+        for (let i = 0; i <= fightIndex; i++) {
+          const prevFight = fights[i];
+          if (prevFight.result === "Win" || prevFight.result === "W") {
             cumulativeRecord += 1;
-          } else if (fight.result === "Loss" || fight.result === "L") {
+          } else if (prevFight.result === "Loss" || prevFight.result === "L") {
             cumulativeRecord -= 1;
-          } else if (fight.result === "Draw" || fight.result === "D") {
-            // Draw stays the same
           }
         }
+        
+        // Adjust Y position so the Crawford fight lands at the target position
+        const yOffset = startingY;
+        const adjustedY = cumulativeRecord + yOffset;
 
         points.push({
           x: adjustedIndex,
-          y: cumulativeRecord,
+          y: adjustedY,
           fight: fight,
           boxer: boxerData.boxer,
           isCrawfordFight: fightIndex === crawfordFightIndex, // Mark if this is the specific Crawford fight for this trajectory
         });
-      });
+      }
 
       return {
         boxer: boxerData.boxer,
