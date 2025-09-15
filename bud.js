@@ -153,22 +153,23 @@ class BoxingRecordsChart {
       });
     });
 
-    // Sort all trajectories by the date of their respective Crawford fight
-    fightersWithCrawfordPositions.sort((a, b) => new Date(a.crawfordFightDate) - new Date(b.crawfordFightDate));
+    // Sort all trajectories by the date of their respective Crawford fight (most recent first)
+    fightersWithCrawfordPositions.sort((a, b) => new Date(b.crawfordFightDate) - new Date(a.crawfordFightDate));
 
-    // Configure positioning so Crawford fight segments form a diagonal rising line
-    // Each Crawford fight will be at a slightly different X position to create diagonal alignment
+    // Configure positioning so Crawford fight segments form a vertical line
+    // All Crawford fights will be at the same X position for vertical alignment
     let crawfordCumulativeWins = 0; // Crawford's cumulative wins counter
     const startingX = 5; // Start the Crawford line from the left
-    const fightSpacing = 2.0; // Spacing between Crawford fights for diagonal alignment (100% longer segments)
+    const fightSpacing = 3.0; // Spacing between individual fights (50% wider)
     
     this.processedData = fightersWithCrawfordPositions.map((boxerData, index) => {
       const fights = boxerData.fights;
       
-      // Position this Crawford fight at the next X location in the diagonal sequence
-      const crawfordFightX = startingX + (index * fightSpacing);
-      const crawfordFightY = -crawfordCumulativeWins; // Y level for this Crawford fight (negative for downward slope)
-      crawfordCumulativeWins += 1; // Crawford wins, so his line goes down for the next fight
+      // Position this Crawford fight at the same X location for vertical alignment
+      const crawfordFightX = startingX; // All Crawford fights at same X position
+      const totalFighters = fightersWithCrawfordPositions.length;
+      const crawfordFightY = (totalFighters - 1 - crawfordCumulativeWins); // Reverse order - latest at top
+      crawfordCumulativeWins += 1; // Crawford wins, so his line goes up for the next fight
       
       // Show the entire career record for each fighter
       const startIndex = 0; // Start from the beginning of their career
@@ -182,11 +183,24 @@ class BoxingRecordsChart {
       const recordAtCrawfordFight = boxerData.recordAtCrawford;
       const startingY = crawfordFightY - recordAtCrawfordFight;
       
+      // For fighters whose first fight was with Crawford, we need to handle the starting point differently
+      if (crawfordFightIndex === 0) {
+        // Add a starting point before the Crawford fight
+        const startingAdjustedIndex = (crawfordFightX - 1) * 2; // Double the spacing to match script.js
+        points.push({
+          x: startingAdjustedIndex,
+          y: startingY,
+          fight: null,
+          boxer: boxerData.boxer,
+          isCrawfordFight: false,
+        });
+      }
+      
       for (let fightIndex = startIndex; fightIndex < endIndex; fightIndex++) {
         const fight = fights[fightIndex];
         // Calculate X position relative to the Crawford fight position
         const relativeIndex = fightIndex - crawfordFightIndex;
-        const adjustedIndex = crawfordFightX + (relativeIndex * fightSpacing); // Use fightSpacing for consistency
+        const adjustedIndex = (crawfordFightX + relativeIndex) * 2; // Double the spacing to match script.js
         
         // Calculate cumulative record up to this fight
         let cumulativeRecord = 0;
@@ -252,6 +266,9 @@ class BoxingRecordsChart {
     // Add lines
     this.addLines(g);
 
+    // Add Crawford bar
+    this.addCrawfordBar(g);
+
     // Add legend
     this.addLegend(g);
   }
@@ -275,7 +292,7 @@ class BoxingRecordsChart {
       .style("font-size", "16px")
       .style("fill", "#cccccc")
       .text(
-        "Each opponent's record shown with Crawford fights creating a rising diagonal line"
+        "Each line represents a fighter's cumulative record, win = +1, loss = -1, draw = 0"
       );
 
     // Add subtitle
@@ -285,7 +302,7 @@ class BoxingRecordsChart {
       .attr("y", 95)
       .style("font-size", "16px")
       .style("fill", "#cccccc")
-      .text("Colored segments connect to visualize Crawford's undefeated streak");
+      .text("The vertical bar highlights their fight with Crawford. All lost.");
 
 
   }
@@ -395,7 +412,7 @@ class BoxingRecordsChart {
 
   addCrawfordBar(g) {
     // Define the fixed X position for all Crawford fights (doubled to match the new spacing)
-    const CRAWFORD_FIGHT_X = 15;
+    const CRAWFORD_FIGHT_X = 5;
 
     // Calculate the width of one segment based on the x-scale and double it
     const segmentWidth = (this.xScale(1) - this.xScale(0)) * 2; // Double the width of one fight unit
@@ -407,7 +424,6 @@ class BoxingRecordsChart {
       .attr("y", 0)
       .attr("width", segmentWidth)
       .attr("height", this.height)
-      // .style("fill", "#FFD700")
       .style("fill", "white")
       .style("opacity", 0.2)
       .style("mix-blend-mode", "color-dodge");
@@ -466,7 +482,7 @@ class BoxingRecordsChart {
         `translate(${this.width + 10}, 20)`
       );
 
-    this.processedData.slice().reverse().forEach((boxerData, i) => {
+    this.processedData.forEach((boxerData, i) => {
       const legendRow = legend
         .append("g")
         .attr("transform", `translate(0, ${i * 24})`)
