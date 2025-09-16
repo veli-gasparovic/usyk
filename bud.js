@@ -8,6 +8,7 @@ class BoxingRecordsChart {
     this.tooltip = this.createTooltip();
     this.colorScale = d3.scaleOrdinal(d3.schemeCategory10);
     this.verticalOrder = false; // Set to true for date-based vertical ordering, false for equal spacing
+    this.showLegend = false; // Variable to control legend visibility
 
     this.init();
   }
@@ -269,8 +270,10 @@ class BoxingRecordsChart {
     // Add Crawford bar
     this.addCrawfordBar(g);
 
-    // Add legend
-    this.addLegend(g);
+    // Add legend only if showLegend is true
+    if (this.showLegend) {
+      this.addLegend(g);
+    }
   }
 
   addTitle() {
@@ -292,7 +295,7 @@ class BoxingRecordsChart {
       .style("font-size", "16px")
       .style("fill", "#cccccc")
       .text(
-        "Each line represents a fighter's cumulative record, win = +1, loss = -1, draw = 0"
+        "Each opponent's line represents their cumulative record, win = +1, loss = -1, draw = 0"
       );
 
     // Add subtitle
@@ -393,7 +396,41 @@ class BoxingRecordsChart {
             .attr("d", line)
             .style("stroke", boxerData.color)
             .style("stroke-width", 4)
-            .style("opacity", 1);
+            .style("opacity", 1)
+            .on("mouseover", (event) => {
+              const fight = boxerData.points[crawfordFightIndex].fight;
+              
+              // Calculate total record from points array
+              let totalWins = 0, totalLosses = 0, totalDraws = 0;
+              boxerData.points.forEach(point => {
+                if (point.fight) {
+                  if (point.fight.result === "Win" || point.fight.result === "W") totalWins++;
+                  else if (point.fight.result === "Loss" || point.fight.result === "L") totalLosses++;
+                  else if (point.fight.result === "Draw" || point.fight.result === "D") totalDraws++;
+                }
+              });
+              
+              this.tooltip
+                .style("opacity", 1)
+                .html(`${boxerData.originalBoxer} (${totalWins}-${totalLosses}-${totalDraws}), ${fight.date}`)
+                .style("left", event.pageX + 10 + "px")
+                .style("top", event.pageY - 35 + "px");
+              
+              // Highlight the associated line
+              g.selectAll(".line")
+                .filter((d) => d[0].boxer === boxerData.boxer)
+                .style("opacity", 1)
+                .style("stroke-width", 3);
+            })
+            .on("mouseout", () => {
+              this.tooltip.style("opacity", 0);
+              
+              // Reset the associated line
+              g.selectAll(".line")
+                .filter((d) => d[0].boxer === boxerData.boxer)
+                .style("opacity", boxerData.originalOpacity)
+                .style("stroke-width", 2);
+            });
         } else if (crawfordFightIndex === 0 && boxerData.points.length > 1) {
           // If Crawford fight is the first fight, highlight the segment from it to the next
           const crawfordSegment = [boxerData.points[0], boxerData.points[1]];
@@ -404,7 +441,41 @@ class BoxingRecordsChart {
             .attr("d", line)
             .style("stroke", boxerData.color)
             .style("stroke-width", 3)
-            .style("opacity", 1);
+            .style("opacity", 1)
+            .on("mouseover", (event) => {
+              const fight = boxerData.points[0].fight;
+              
+              // Calculate total record from points array
+              let totalWins = 0, totalLosses = 0, totalDraws = 0;
+              boxerData.points.forEach(point => {
+                if (point.fight) {
+                  if (point.fight.result === "Win" || point.fight.result === "W") totalWins++;
+                  else if (point.fight.result === "Loss" || point.fight.result === "L") totalLosses++;
+                  else if (point.fight.result === "Draw" || point.fight.result === "D") totalDraws++;
+                }
+              });
+              
+              this.tooltip
+                .style("opacity", 1)
+                .html(`${boxerData.originalBoxer} (${totalWins}-${totalLosses}-${totalDraws}), ${fight.date}`)
+                .style("left", event.pageX + 10 + "px")
+                .style("top", event.pageY - 35 + "px");
+              
+              // Highlight the associated line
+              g.selectAll(".line")
+                .filter((d) => d[0].boxer === boxerData.boxer)
+                .style("opacity", 1)
+                .style("stroke-width", 3);
+            })
+            .on("mouseout", () => {
+              this.tooltip.style("opacity", 0);
+              
+              // Reset the associated line
+              g.selectAll(".line")
+                .filter((d) => d[0].boxer === boxerData.boxer)
+                .style("opacity", boxerData.originalOpacity)
+                .style("stroke-width", 2);
+            });
         }
       }
     });
@@ -426,7 +497,8 @@ class BoxingRecordsChart {
       .attr("height", this.height)
       .style("fill", "white")
       .style("opacity", 0.2)
-      .style("mix-blend-mode", "color-dodge");
+      .style("mix-blend-mode", "color-dodge")
+      .style("pointer-events", "none");
 
     // Add text label to the right of the bar
     const textX = barX + segmentWidth + 10; // 10px to the right of the bar
@@ -449,7 +521,7 @@ class BoxingRecordsChart {
       .style("font-size", "12px")
       .style("font-weight", "bold")
       .style("opacity", 0.7)
-      .text("Filter");
+      .text("Fight");
 
     // Add author attribution at bottom of bar
     g.append("text")
