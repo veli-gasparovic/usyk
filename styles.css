@@ -15,7 +15,7 @@ body {
     /* width: 100vw; */
     max-width: 1600px;
     max-height: 1200px;
-    height: 1200px;
+    height: 100vh;
     position: relative;
     background-color: #1a1a1a;
 }

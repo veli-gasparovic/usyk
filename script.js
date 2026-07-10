@@ -187,6 +187,16 @@ class BoxingRecordsChart {
       // Use the specific Usyk fight index for this trajectory
       const usykFightIndex = boxerData.usykFightIndex;
 
+      // Baseline point before the first fight, so the first fight's
+      // win/loss renders as a visible stroke
+      points.push({
+        x: (-1 - usykFightIndex + USYK_FIGHT_X) * 2,
+        y: startingY,
+        fight: null,
+        boxer: boxerData.boxer,
+        isUsykFight: false,
+      });
+
       fights.forEach((fight, index) => {
         let adjustedIndex = index;
 
