@@ -250,12 +250,34 @@ class BoxingRecordsChart {
       };
     });
 
-    // Headline numbers for the stat tiles
+    // Headline numbers for the stat tiles: each unique fighter's full
+    // career, split into fights vs Usyk and fights vs everyone else,
+    // so the two records are directly comparable.
+    const uniqueFighters = new Set(
+      this.processedData.map((d) => d.originalBoxer)
+    );
+    let worldW = 0;
+    let worldL = 0;
+    let worldD = 0;
+    let usykBouts = 0;
+    this.data.forEach((boxerData) => {
+      if (!uniqueFighters.has(boxerData.boxer)) return;
+      boxerData.fights.forEach((fight) => {
+        if (fight.opponent === "Oleksandr Usyk") {
+          usykBouts += 1;
+          return;
+        }
+        if (fight.result === "Win" || fight.result === "W") worldW += 1;
+        else if (fight.result === "Loss" || fight.result === "L") worldL += 1;
+        else if (fight.result === "Draw" || fight.result === "D") worldD += 1;
+      });
+    });
     this.stats = {
-      fighters: new Set(this.processedData.map((d) => d.originalBoxer)).size,
-      encounters: this.processedData.length,
-      preW: d3.sum(this.processedData, (d) => d.preW),
-      preL: d3.sum(this.processedData, (d) => d.preL),
+      fighters: uniqueFighters.size,
+      usykBouts,
+      worldW,
+      worldL,
+      worldD,
     };
   }
 
@@ -266,12 +288,15 @@ class BoxingRecordsChart {
 
     const tiles = [
       { value: String(this.stats.fighters), label: "challengers" },
-      { value: String(this.stats.encounters), label: "nights vs Usyk" },
       {
-        value: `${this.stats.preW}–${this.stats.preL}`,
-        label: "their combined record, walking in",
+        value: `${this.stats.worldW}–${this.stats.worldL}–${this.stats.worldD}`,
+        label: "their combined record vs everyone else",
       },
-      { value: "0", label: "wins against Usyk", hero: true },
+      {
+        value: `0–${this.stats.usykBouts}`,
+        label: "their combined record vs Usyk",
+        hero: true,
+      },
     ];
 
     tiles.forEach((tile) => {
