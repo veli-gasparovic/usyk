@@ -7,7 +7,7 @@ class BoxingRecordsChart {
     this.svg = d3.select("#chart");
     this.tooltip = this.createTooltip();
     this.colorScale = d3.scaleOrdinal(d3.schemeCategory10);
-    this.verticalOrder = false; // Set to true for date-based vertical ordering, false for equal spacing
+    this.verticalOrder = true; // Set to true for date-based vertical ordering, false for equal spacing
 
     this.init();
   }
@@ -166,7 +166,18 @@ class BoxingRecordsChart {
       const dateYScale = d3.scaleTime()
         .domain(dateExtent)
         .range([-20, 20]);
-      targetUsykYFunction = (boxerData) => dateYScale(new Date(boxerData.usykFightDate));
+      // Entries are date-sorted, so a forward pass enforcing a minimum gap
+      // resolves overlaps while preserving chronological order
+      const minGap = 1;
+      const targetYs = fightersWithUsykPositions.map((d) =>
+        dateYScale(new Date(d.usykFightDate))
+      );
+      for (let i = 1; i < targetYs.length; i++) {
+        if (targetYs[i] - targetYs[i - 1] < minGap) {
+          targetYs[i] = targetYs[i - 1] + minGap;
+        }
+      }
+      targetUsykYFunction = (boxerData, index) => targetYs[index];
     } else {
       // Equal spacing
       const spacing = 2; // Vertical spacing between Usyk segments
