@@ -262,3 +262,18 @@ body {
         transition: none;
     }
 }
+
+@media (max-width: 640px) {
+    .subtitle,
+    .stats {
+        display: none;
+    }
+
+    .viz-header {
+        padding: 14px 16px 8px;
+    }
+
+    .viz-header h1 {
+        font-size: 20px;
+    }
+}
