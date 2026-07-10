@@ -79,9 +79,31 @@
     </script>
   </head>
   <body>
+    <header class="viz-header">
+      <div class="title-block">
+        <h1>The Usyk Filter</h1>
+        <p class="subtitle">
+          Every professional career that ran into Oleksandr Usyk. Each line is
+          a fighter's cumulative record (win&nbsp;+1, loss&nbsp;−1); the gold
+          bar is the night they met him, stacked bottom-to-top in time.
+          <strong>All of them lost.</strong>
+        </p>
+      </div>
+      <div class="stats" id="stats" aria-label="Summary statistics"></div>
+    </header>
     <div id="chart-container">
-      <svg id="chart"></svg>
+      <svg
+        id="chart"
+        role="img"
+        aria-label="Line chart of every challenger's cumulative career record, aligned on their fight against Oleksandr Usyk. All challengers lost."
+      ></svg>
     </div>
+    <details id="data-panel">
+      <summary>View as table</summary>
+      <div class="table-wrap">
+        <table id="data-table"></table>
+      </div>
+    </details>
     <script src="script.js"></script>
   </body>
 </html>

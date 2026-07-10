@@ -1,13 +1,32 @@
 // Initialize Mixpanel
 mixpanel.init("af7a3b5acec336f429aba394a5ad602c");
 
+// Validated accent pair on the dark surface (#1a1a19):
+// gold #c98500 + red #e66767 — CVD deltaE 35.9, both >= 3:1 contrast
+const INK = {
+  gold: "#c98500",
+  goldBright: "#eda100",
+  loss: "#e66767",
+  primary: "#ffffff",
+  secondary: "#c3c2b7",
+  muted: "#898781",
+  hairline: "#2c2c2a",
+  surface: "#1a1a19",
+};
+
+const PRE_OPACITY = 0.18; // career before the Usyk fight
+const POST_OPACITY = 0.07; // career after the Usyk fight
+
 class BoxingRecordsChart {
   constructor() {
-    this.margin = { top: 80, right: 10, bottom: 60, left: 30 };
+    this.margin = { top: 26, right: 36, bottom: 20, left: 28 };
     this.svg = d3.select("#chart");
     this.tooltip = this.createTooltip();
-    this.colorScale = d3.scaleOrdinal(d3.schemeCategory10);
     this.verticalOrder = true; // Set to true for date-based vertical ordering, false for equal spacing
+    this.hasAnimated = false;
+    this.reducedMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)"
+    ).matches;
 
     this.init();
   }
@@ -43,6 +62,8 @@ class BoxingRecordsChart {
     this.data = await this.loadCSVData("bouts.csv");
     console.log("Loaded data:", this.data);
     this.processData();
+    this.renderStats();
+    this.renderTable();
     this.render();
 
     // Track successful data load
@@ -50,46 +71,6 @@ class BoxingRecordsChart {
       dataSource: "CSV",
       fightersCount: this.data.length,
     });
-  }
-
-  generateSampleData() {
-    // Sample data structure - will be replaced by CSV data
-    return [
-      {
-        boxer: "Oleksandr Usyk",
-        fights: [
-          { opponent: "Opponent1", result: "W", fightNumber: 1 },
-          { opponent: "Opponent2", result: "W", fightNumber: 2 },
-          { opponent: "Opponent3", result: "W", fightNumber: 3 },
-          { opponent: "Anthony Joshua", result: "W", fightNumber: 4 },
-          { opponent: "Anthony Joshua", result: "W", fightNumber: 5 },
-          { opponent: "Tyson Fury", result: "W", fightNumber: 6 },
-        ],
-      },
-      {
-        boxer: "Anthony Joshua",
-        fights: [
-          { opponent: "Fighter1", result: "W", fightNumber: 1 },
-          { opponent: "Fighter2", result: "W", fightNumber: 2 },
-          { opponent: "Fighter3", result: "W", fightNumber: 3 },
-          { opponent: "Oleksandr Usyk", result: "L", fightNumber: 4 },
-          { opponent: "Fighter5", result: "W", fightNumber: 5 },
-          { opponent: "Fighter6", result: "W", fightNumber: 6 },
-          { opponent: "Oleksandr Usyk", result: "L", fightNumber: 7 },
-          { opponent: "Fighter8", result: "W", fightNumber: 8 },
-        ],
-      },
-      {
-        boxer: "Tyson Fury",
-        fights: [
-          { opponent: "Fighter1", result: "W", fightNumber: 1 },
-          { opponent: "Fighter2", result: "W", fightNumber: 2 },
-          { opponent: "Fighter3", result: "D", fightNumber: 3 },
-          { opponent: "Fighter4", result: "W", fightNumber: 4 },
-          { opponent: "Oleksandr Usyk", result: "L", fightNumber: 5 },
-        ],
-      },
-    ];
   }
 
   processData() {
@@ -112,63 +93,78 @@ class BoxingRecordsChart {
         boxerData.fights.some((fight) => fight.opponent === "Oleksandr Usyk")
     );
 
-    // Create color mapping for opponents - ensure same color for same opponent
-    this.opponentColorMap = new Map();
-    fightersWithUsyk.forEach((boxerData) => {
-      if (!this.opponentColorMap.has(boxerData.boxer)) {
-        this.opponentColorMap.set(boxerData.boxer, this.colorScale(boxerData.boxer));
-      }
-    });
-
     // First pass: calculate each fighter's record at EACH Usyk fight (create multiple trajectories)
     const fightersWithUsykPositions = [];
-    
+
     fightersWithUsyk.forEach((boxerData) => {
       const fights = boxerData.fights;
-      
+
       // Find ALL Usyk fights for this boxer
       fights.forEach((fight, index) => {
         if (fight.opponent === "Oleksandr Usyk") {
-          // Calculate cumulative record up to (but not including) this specific Usyk fight
+          // Cumulative record up to (but not including) this specific Usyk fight
           let recordAtUsyk = 0;
+          let preW = 0;
+          let preL = 0;
           for (let i = 0; i < index; i++) {
             const prevFight = fights[i];
-            if (prevFight.result === "Win" || prevFight.result === "W") recordAtUsyk += 1;
-            else if (prevFight.result === "Loss" || prevFight.result === "L") recordAtUsyk -= 1;
+            if (prevFight.result === "Win" || prevFight.result === "W") {
+              recordAtUsyk += 1;
+              preW += 1;
+            } else if (
+              prevFight.result === "Loss" ||
+              prevFight.result === "L"
+            ) {
+              recordAtUsyk -= 1;
+              preL += 1;
+            }
           }
 
           // Count how many Usyk fights this boxer has had
-          const totalUsykFights = fights.filter(f => f.opponent === "Oleksandr Usyk").length;
-          const usykFightNumber = fights.slice(0, index + 1).filter(f => f.opponent === "Oleksandr Usyk").length;
-          
+          const totalUsykFights = fights.filter(
+            (f) => f.opponent === "Oleksandr Usyk"
+          ).length;
+          const usykFightNumber = fights
+            .slice(0, index + 1)
+            .filter((f) => f.opponent === "Oleksandr Usyk").length;
+
           fightersWithUsykPositions.push({
             ...boxerData,
             usykFightIndex: index,
             recordAtUsyk,
+            preW,
+            preL,
             originalBoxer: boxerData.boxer, // Store original name for color mapping
-            boxer: totalUsykFights > 1 ? `${boxerData.boxer} (${usykFightNumber})` : boxerData.boxer,
+            boxer:
+              totalUsykFights > 1
+                ? `${boxerData.boxer} (${usykFightNumber})`
+                : boxerData.boxer,
             usykFightDate: fight.date, // Store the date of this specific Usyk fight for sorting
+            usykFight: fight,
           });
         }
       });
     });
 
     // Sort all trajectories by the date of their respective Usyk fight
-    fightersWithUsykPositions.sort((a, b) => new Date(a.usykFightDate) - new Date(b.usykFightDate));
+    fightersWithUsykPositions.sort(
+      (a, b) => new Date(a.usykFightDate) - new Date(b.usykFightDate)
+    );
 
     // Configure vertical positioning for the Usyk segments
     let targetUsykYFunction;
-    
+
     if (this.verticalOrder) {
       // Date-based Y positioning
-      const allUsykDates = fightersWithUsykPositions.map(d => new Date(d.usykFightDate));
+      const allUsykDates = fightersWithUsykPositions.map(
+        (d) => new Date(d.usykFightDate)
+      );
       const dateExtent = d3.extent(allUsykDates);
-      const dateYScale = d3.scaleTime()
-        .domain(dateExtent)
-        .range([-20, 20]);
+      const dateYScale = d3.scaleTime().domain(dateExtent).range([-20, 20]);
       // Entries are date-sorted, so a forward pass enforcing a minimum gap
       // resolves overlaps while preserving chronological order
-      const minGap = 1;
+      const minGap = 1.3;
+      this.minGap = minGap;
       const targetYs = fightersWithUsykPositions.map((d) =>
         dateYScale(new Date(d.usykFightDate))
       );
@@ -193,6 +189,8 @@ class BoxingRecordsChart {
       // Calculate starting position to achieve target Usyk Y position
       const startingY = targetUsykY - boxerData.recordAtUsyk;
       let cumulativeRecord = startingY;
+      let cumW = 0;
+      let cumL = 0;
       const points = [];
 
       // Use the specific Usyk fight index for this trajectory
@@ -206,6 +204,8 @@ class BoxingRecordsChart {
         fight: null,
         boxer: boxerData.boxer,
         isUsykFight: false,
+        cumW: 0,
+        cumL: 0,
       });
 
       fights.forEach((fight, index) => {
@@ -220,8 +220,10 @@ class BoxingRecordsChart {
         // Update cumulative record based on actual result values BEFORE adding the point
         if (fight.result === "Win" || fight.result === "W") {
           cumulativeRecord += 1;
+          cumW += 1;
         } else if (fight.result === "Loss" || fight.result === "L") {
           cumulativeRecord -= 1;
+          cumL += 1;
         } else if (fight.result === "Draw" || fight.result === "D") {
           // Draw stays the same (no change to cumulativeRecord)
         }
@@ -232,23 +234,96 @@ class BoxingRecordsChart {
           fight: fight,
           boxer: boxerData.boxer,
           isUsykFight: index === usykFightIndex, // Mark if this is the specific Usyk fight for this trajectory
+          cumW,
+          cumL,
         });
       });
 
       return {
         boxer: boxerData.boxer,
-        originalBoxer: boxerData.originalBoxer, // Keep original boxer name 
+        originalBoxer: boxerData.originalBoxer, // Keep original boxer name
+        usykFightDate: boxerData.usykFightDate,
+        usykFight: boxerData.usykFight,
+        preW: boxerData.preW,
+        preL: boxerData.preL,
         points: points,
-        color: this.opponentColorMap.get(boxerData.originalBoxer), // Use color based on original name
       };
     });
+
+    // Headline numbers for the stat tiles
+    this.stats = {
+      fighters: new Set(this.processedData.map((d) => d.originalBoxer)).size,
+      encounters: this.processedData.length,
+      preW: d3.sum(this.processedData, (d) => d.preW),
+      preL: d3.sum(this.processedData, (d) => d.preL),
+    };
+  }
+
+  renderStats() {
+    const container = document.getElementById("stats");
+    if (!container || !this.stats) return;
+    container.replaceChildren();
+
+    const tiles = [
+      { value: String(this.stats.fighters), label: "challengers" },
+      { value: String(this.stats.encounters), label: "nights vs Usyk" },
+      {
+        value: `${this.stats.preW}–${this.stats.preL}`,
+        label: "their combined record, walking in",
+      },
+      { value: "0", label: "wins against Usyk", hero: true },
+    ];
+
+    tiles.forEach((tile) => {
+      const el = document.createElement("div");
+      el.className = "stat-tile" + (tile.hero ? " stat-hero" : "");
+      const value = document.createElement("div");
+      value.className = "stat-value";
+      value.textContent = tile.value;
+      const label = document.createElement("div");
+      label.className = "stat-label";
+      label.textContent = tile.label;
+      el.append(value, label);
+      container.append(el);
+    });
+  }
+
+  renderTable() {
+    const table = document.getElementById("data-table");
+    if (!table || !this.processedData) return;
+    table.replaceChildren();
+
+    const thead = document.createElement("thead");
+    const headRow = document.createElement("tr");
+    ["Date", "Challenger", "Walked in", "Result", "Method"].forEach((h) => {
+      const th = document.createElement("th");
+      th.textContent = h;
+      headRow.append(th);
+    });
+    thead.append(headRow);
+
+    const tbody = document.createElement("tbody");
+    this.processedData.forEach((d) => {
+      const tr = document.createElement("tr");
+      [
+        d.usykFightDate,
+        d.boxer,
+        `${d.preW}–${d.preL}`,
+        "Loss",
+        d.usykFight.method,
+      ].forEach((cell) => {
+        const td = document.createElement("td");
+        td.textContent = cell;
+        tr.append(td);
+      });
+      tbody.append(tr);
+    });
+
+    table.append(thead, tbody);
   }
 
   render() {
     this.svg.selectAll("*").remove();
-
-    // Add title
-    this.addTitle();
 
     const g = this.svg
       .append("g")
@@ -269,302 +344,312 @@ class BoxingRecordsChart {
       .domain([yExtent[0] - yPadding, yExtent[1] + yPadding])
       .range([this.height, 0]);
 
-    // Add Y axis only
-    // this.addYAxis(g);
-
-    // Add lines
-    this.addLines(g);
-
-    // Add Usyk fight vertical bar
     this.addUsykBar(g);
+    this.addEraDivider(g);
+    this.addTrajectories(g);
 
-    // Add legend
-    this.addLegend(g);
+    this.hasAnimated = true;
   }
 
-  addTitle() {
-    // Add main title
-    this.svg
-      .append("text")
-      .attr("x", this.margin.left)
-      .attr("y", 50)
-      .style("font-size", "24px")
-      .style("font-weight", "bold")
-      .style("fill", "#ffd700")
-      .text("Facing the Usyk Filter");
+  // The gold bar: every trajectory's Usyk fight lands inside it
+  addUsykBar(g) {
+    const USYK_FIGHT_X = 15;
+    const barLeft = this.xScale((USYK_FIGHT_X - 1) * 2);
+    const barRight = this.xScale(USYK_FIGHT_X * 2);
+    const barWidth = barRight - barLeft;
 
-    // Add subtitle
-    this.svg
-      .append("text")
-      .attr("x", this.margin.left)
-      .attr("y", 75)
-      .style("font-size", "16px")
-      .style("fill", "#cccccc")
-      .text(
-        "Each line represents a fighter's cumulative record, win = +1, loss = -1, draw = 0"
-      );
+    g.append("rect")
+      .attr("x", barLeft)
+      .attr("y", 0)
+      .attr("width", barWidth)
+      .attr("height", this.height)
+      .style("fill", INK.gold)
+      .style("opacity", 0.1);
 
-    // Add subtitle
-    this.svg
-      .append("text")
-      .attr("x", this.margin.left)
-      .attr("y", 95)
-      .style("font-size", "16px")
-      .style("fill", "#cccccc")
-      .text("The vertical bar highlights their fight with Usyk. All lost.");
-
-
-  }
-
-  addYAxis(g) {
-    // Y axis with tick numbers but no label
-    g.append("g").attr("class", "axis").call(d3.axisLeft(this.yScale));
-  }
-
-  addGrid(g) {
-    // X grid
-    g.append("g")
-      .attr("class", "grid")
-      .attr("transform", `translate(0,${this.height})`)
-      .call(d3.axisBottom(this.xScale).tickSize(-this.height).tickFormat(""));
-
-    // Y grid
-    g.append("g")
-      .attr("class", "grid")
-      .call(d3.axisLeft(this.yScale).tickSize(-this.width).tickFormat(""));
-  }
-
-  addAxes(g) {
-    // X axis
-    g.append("g")
-      .attr("class", "axis")
-      .attr("transform", `translate(0,${this.height})`)
-      .call(d3.axisBottom(this.xScale).tickFormat(d3.format("d")));
-
-    // Y axis
-    g.append("g").attr("class", "axis").call(d3.axisLeft(this.yScale));
-
-    // Axis labels
-    g.append("text")
-      .attr("transform", "rotate(-90)")
-      .attr("y", 0 - this.margin.left)
-      .attr("x", 0 - this.height / 2)
-      .attr("dy", "1em")
-      .style("text-anchor", "middle")
-      .style("fill", "#ffffff")
-      .text("Cumulative Record (+1 Win, -1 Loss, 0 Draw)");
+    // Hairline gold edges give the bar a defined "gate" reading
+    [barLeft, barRight].forEach((x) => {
+      g.append("line")
+        .attr("x1", x)
+        .attr("x2", x)
+        .attr("y1", 0)
+        .attr("y2", this.height)
+        .style("stroke", INK.gold)
+        .style("stroke-width", 1)
+        .style("opacity", 0.35);
+    });
 
     g.append("text")
-      .attr(
-        "transform",
-        `translate(${this.width / 2}, ${this.height + this.margin.bottom - 10})`
-      )
-      .style("text-anchor", "middle")
-      .style("fill", "#ffffff")
-      .text("Fight Number");
+      .attr("x", (barLeft + barRight) / 2)
+      .attr("y", -10)
+      .attr("text-anchor", "middle")
+      .style("fill", INK.goldBright)
+      .style("font-size", "11px")
+      .style("font-weight", "600")
+      .style("letter-spacing", "0.08em")
+      .text("THE USYK FIGHT");
+
+    // Author attribution
+    g.append("text")
+      .attr("x", barRight + 10)
+      .attr("y", this.height - 8)
+      .style("fill", INK.muted)
+      .style("font-size", "11px")
+      .style("opacity", 0.6)
+      .text("@velimirgasp");
   }
 
-  addLines(g) {
+  // Divider between Usyk's cruiserweight and heavyweight victims
+  addEraDivider(g) {
+    const cutoff = new Date("2019-06-01");
+    const k = this.processedData.findIndex(
+      (d) => new Date(d.usykFightDate) >= cutoff
+    );
+    if (k <= 0) return;
+
+    const segMidY = (d) => {
+      const p = d.points.find((pt) => pt.isUsykFight);
+      return this.yScale(p.y + 0.5);
+    };
+    const y = (segMidY(this.processedData[k - 1]) + segMidY(this.processedData[k])) / 2;
+
+    const USYK_FIGHT_X = 15;
+    const barLeft = this.xScale((USYK_FIGHT_X - 1) * 2);
+    const barRight = this.xScale(USYK_FIGHT_X * 2);
+
+    g.append("line")
+      .attr("x1", barLeft - 110)
+      .attr("x2", barRight + 6)
+      .attr("y1", y)
+      .attr("y2", y)
+      .style("stroke", INK.hairline)
+      .style("stroke-width", 1);
+
+    const eraLabel = (text, dy) =>
+      g
+        .append("text")
+        .attr("x", barLeft - 116)
+        .attr("y", y + dy)
+        .attr("text-anchor", "end")
+        .attr("paint-order", "stroke")
+        .attr("stroke", INK.surface)
+        .attr("stroke-width", 3)
+        .style("fill", INK.muted)
+        .style("font-size", "9px")
+        .style("letter-spacing", "0.12em")
+        .text(text);
+
+    eraLabel("HEAVYWEIGHT", -5);
+    eraLabel("CRUISERWEIGHT", 12);
+  }
+
+  addTrajectories(g) {
     const line = d3
       .line()
       .x((d) => this.xScale(d.x))
       .y((d) => this.yScale(d.y))
       .curve(d3.curveLinear);
 
-    this.processedData.forEach((boxerData) => {
-      // Add main line with random opacity
-      const randomOpacity = 0.05 + Math.random() * 0.15; // Random between 0.05 and 0.4
-      boxerData.originalOpacity = randomOpacity; // Store original opacity for hover reset
-      g.append("path")
-        .datum(boxerData.points)
+    const USYK_FIGHT_X = 15;
+    const barRight = this.xScale(USYK_FIGHT_X * 2);
+    const animate = !this.hasAnimated && !this.reducedMotion;
+
+    // Ladder labels shrink with the available vertical gap between rungs
+    const gapPx =
+      (this.yScale(0) - this.yScale(this.minGap || 1)) || 14;
+    const labelFontSize = Math.max(8.5, Math.min(11, gapPx - 3));
+
+    this.processedData.forEach((boxerData, i) => {
+      const points = boxerData.points;
+      const usykIdx = points.findIndex((p) => p.isUsykFight);
+      const prePoints = points.slice(0, usykIdx + 1);
+      const postPoints = points.slice(usykIdx);
+      const lossSegment = [points[usykIdx - 1], points[usykIdx]];
+      const usykPoint = points[usykIdx];
+
+      const traj = g.append("g").attr("class", "traj");
+
+      // Career before Usyk
+      const pre = traj
+        .append("path")
+        .datum(prePoints)
         .attr("class", "line")
         .attr("d", line)
-        .style("stroke", "white")
-        .style("stroke-width", 2)
-        .style("opacity", randomOpacity)        
+        .style("fill", "none")
+        .style("stroke", INK.primary)
+        .style("stroke-width", 1.5)
+        .style("opacity", PRE_OPACITY);
 
-      // Add colored segment for Usyk fight  
-      // Find the point that is marked as the Usyk fight for this specific trajectory
-      const usykFightIndex = boxerData.points.findIndex(
-        (point) => point.isUsykFight === true
-      );
-      if (usykFightIndex !== -1) {
-        // Always highlight the segment TO the Usyk fight point (showing the loss)
-        if (usykFightIndex > 0) {
-          const usykSegment = [
-            boxerData.points[usykFightIndex - 1],
-            boxerData.points[usykFightIndex],
-          ];
+      // Career after Usyk — quieter: most never recover
+      const post = traj
+        .append("path")
+        .datum(postPoints)
+        .attr("class", "line")
+        .attr("d", line)
+        .style("fill", "none")
+        .style("stroke", INK.primary)
+        .style("stroke-width", 1.5)
+        .style("opacity", animate ? 0 : POST_OPACITY);
 
-          g.append("path")
-            .datum(usykSegment)
-            .attr("class", "usyk-fight-segment")
-            .attr("d", line)
-            .style("stroke", boxerData.color)
-            .style("stroke-width", 4)
-            .style("opacity", 1);
-        } else if (usykFightIndex === 0 && boxerData.points.length > 1) {
-          // If Usyk fight is the first fight, highlight the segment from it to the next
-          const usykSegment = [boxerData.points[0], boxerData.points[1]];
+      // The loss itself
+      const loss = traj
+        .append("path")
+        .datum(lossSegment)
+        .attr("d", line)
+        .style("fill", "none")
+        .style("stroke", INK.loss)
+        .style("stroke-width", 3)
+        .style("stroke-linecap", "round")
+        .style("opacity", animate ? 0 : 1);
 
-          g.append("path")
-            .datum(usykSegment)
-            .attr("class", "usyk-fight-segment")
-            .attr("d", line)
-            .style("stroke", boxerData.color)
-            .style("stroke-width", 3)
-            .style("opacity", 1);
-        }
-      }
-    });
-  }
+      const dot = traj
+        .append("circle")
+        .attr("cx", this.xScale(usykPoint.x))
+        .attr("cy", this.yScale(usykPoint.y))
+        .attr("r", 2.5)
+        .style("fill", INK.loss)
+        .style("opacity", animate ? 0 : 1);
 
-  addUsykBar(g) {
-    // Define the fixed X position for all Usyk fights (doubled to match the new spacing)
-    const USYK_FIGHT_X = 15;
-
-    // Calculate the width of one segment based on the x-scale and double it
-    const segmentWidth = (this.xScale(1) - this.xScale(0)) * 2; // Double the width of one fight unit
-    const barX = this.xScale(USYK_FIGHT_X * 2) - segmentWidth;
-    const barCenterX = barX + segmentWidth / 2;
-
-    g.append("rect")
-      .attr("x", barX)
-      .attr("y", 0)
-      .attr("width", segmentWidth)
-      .attr("height", this.height)
-      // .style("fill", "#FFD700")
-      .style("fill", "white")
-      .style("opacity", 0.2)
-      .style("mix-blend-mode", "color-dodge");
-
-    // Add text label to the right of the bar
-    const textX = barX + segmentWidth + 10; // 10px to the right of the bar
-
-    g.append("text")
-      .attr("x", textX)
-      .attr("y", 15) // First line at top level
-      .attr("text-anchor", "start")
-      .style("fill", "#ffffff")
-      .style("font-size", "12px")
-      .style("font-weight", "bold")
-      .style("opacity", 0.7)
-      .text("Usyk");
-
-    g.append("text")
-      .attr("x", textX)
-      .attr("y", 30) // Second line below first
-      .attr("text-anchor", "start")
-      .style("fill", "#ffffff")
-      .style("font-size", "12px")
-      .style("font-weight", "bold")
-      .style("opacity", 0.7)
-      .text("Filter");
-
-    // Add author attribution at bottom of bar
-    g.append("text")
-      .attr("x", textX)
-      .attr("y", this.height - 25) // First line at bottom
-      .attr("text-anchor", "start")
-      .style("fill", "#ffffff")
-      .style("font-size", "12px")
-      .style("font-weight", "bold")
-      .style("opacity", 0.2)
-      .text("Author:");
-
-    g.append("text")
-      .attr("x", textX)
-      .attr("y", this.height - 10) // Second line below first
-      .attr("text-anchor", "start")
-      .style("fill", "#ffffff")
-      .style("font-size", "12px")
-      .style("font-weight", "bold")
-      .style("opacity", 0.2)
-      .text("@velimirgasp");
-  }
-
-  addLegend(g) {
-    const legend = g
-      .append("g")
-      .attr("class", "legend")
-      .attr(
-        "transform",
-        `translate(${Math.max(this.width - 150, 10)}, 20)`
-      );
-
-    this.processedData.slice().reverse().forEach((boxerData, i) => {
-      const legendRow = legend
-        .append("g")
-        .attr("transform", `translate(0, ${i * 24})`)
-        .style("cursor", "pointer");
-
-      legendRow
-        .append("line")
-        .attr("x1", 0)
-        .attr("y1", 3)
-        .attr("x2", 18)
-        .attr("y2", 15)
-        .style("stroke", boxerData.color)
-        .style("stroke-width", 4)
-        .style("opacity", 1);
-
-      legendRow
+      // Direct label: the bar doubles as a chronological ladder
+      const year = new Date(boxerData.usykFightDate).getFullYear();
+      const label = traj
         .append("text")
-        .attr("x", 22)
-        .attr("y", 9)
+        .attr("x", barRight + 10)
+        .attr("y", this.yScale(usykPoint.y + 0.5))
         .attr("dy", "0.35em")
-        .style("fill", "#ffffff")
-        .style("font-size", "12px")
-        .style("opacity", 0.7)
-        .text(boxerData.boxer);
+        .attr("paint-order", "stroke")
+        .attr("stroke", INK.surface)
+        .attr("stroke-width", 3)
+        .style("fill", INK.secondary)
+        .style("font-size", `${labelFontSize}px`)
+        .style("cursor", "default")
+        .style("opacity", animate ? 0 : 1)
+        .text(`${year} · ${boxerData.boxer}`);
 
-      // Add hover functionality
-      legendRow
-        .on("mouseover", () => {
-          console.log("Fighter Hovered", boxerData.boxer);
-          // Track fighter hover
-          mixpanel.track("Fighter Hovered", {
-            fighterName: boxerData.boxer,
-            timestamp: new Date().toISOString(),
-          });
+      const els = { pre, post, loss, dot, label };
 
-          // Highlight only the associated line
-          g.selectAll(".line")
-            .filter((d) => d[0].boxer === boxerData.boxer)
-            .style("opacity", 1)
-            .style("stroke-width", 2);
+      // Chronological draw-in: careers appear bottom-up, in the order
+      // they ran into Usyk
+      if (animate) {
+        const len = pre.node().getTotalLength();
+        const drawDur = Math.min(1000, Math.max(300, len * 0.8));
+        const delay = 200 + i * 70;
+        const revealed = delay + drawDur;
 
-          // Underline the fighter name
-          legendRow.select("text").style("text-decoration", "underline");
-        })
-        .on("mouseout", () => {
-          // Reset only the associated line
-          g.selectAll(".line")
-            .filter((d) => d[0].boxer === boxerData.boxer)
-            .style("opacity", boxerData.originalOpacity)
-            .style("stroke-width", 2);
+        pre
+          .attr("stroke-dasharray", `${len} ${len}`)
+          .attr("stroke-dashoffset", len)
+          .transition()
+          .delay(delay)
+          .duration(drawDur)
+          .ease(d3.easeQuadOut)
+          .attr("stroke-dashoffset", 0)
+          .on("end", () => pre.attr("stroke-dasharray", null));
 
-          // Remove underline from fighter name
-          legendRow.select("text").style("text-decoration", "none");
+        loss.transition().delay(revealed).duration(260).style("opacity", 1);
+        dot.transition().delay(revealed).duration(260).style("opacity", 1);
+        label.transition().delay(revealed).duration(320).style("opacity", 1);
+        post
+          .transition()
+          .delay(revealed + 120)
+          .duration(420)
+          .style("opacity", POST_OPACITY);
+      }
+
+      // Transparent hit path: the whole neighborhood of a line is hoverable
+      const hit = traj
+        .append("path")
+        .datum(points)
+        .attr("d", line)
+        .style("fill", "none")
+        .style("stroke", "rgba(0,0,0,0)")
+        .style("stroke-width", 16)
+        .style("pointer-events", "stroke")
+        .style("cursor", "crosshair");
+
+      const highlight = (on) => {
+        pre
+          .style("opacity", on ? 0.95 : PRE_OPACITY)
+          .style("stroke-width", on ? 2 : 1.5);
+        post
+          .style("opacity", on ? 0.5 : POST_OPACITY)
+          .style("stroke-width", on ? 2 : 1.5);
+        loss.style("stroke-width", on ? 4 : 3);
+        label
+          .style("fill", on ? INK.primary : INK.secondary)
+          .style("font-weight", on ? "600" : "400");
+      };
+
+      const onEnter = () => {
+        highlight(true);
+        mixpanel.track("Fighter Hovered", {
+          fighterName: boxerData.boxer,
+          timestamp: new Date().toISOString(),
         });
+      };
+      const onLeave = () => {
+        highlight(false);
+        this.hideTooltip();
+      };
+
+      hit
+        .on("mouseenter", onEnter)
+        .on("mouseleave", onLeave)
+        .on("mousemove", (event) => {
+          const [mx] = d3.pointer(event, g.node());
+          const xVal = this.xScale.invert(mx);
+          let nearest = points[0];
+          for (const p of points) {
+            if (Math.abs(p.x - xVal) < Math.abs(nearest.x - xVal)) nearest = p;
+          }
+          this.showTooltip(event, nearest, boxerData);
+        });
+
+      label
+        .on("mouseenter", onEnter)
+        .on("mouseleave", onLeave)
+        .on("mousemove", (event) =>
+          this.showTooltip(event, usykPoint, boxerData)
+        );
     });
   }
 
-  showTooltip(event, d) {
+  showTooltip(event, point, boxerData) {
+    const node = this.tooltip.node();
+    node.replaceChildren();
+
+    const name = document.createElement("div");
+    name.className = "tt-name";
+    name.textContent = boxerData.boxer;
+    node.append(name);
+
+    const value = document.createElement("div");
+    value.className = "tt-value";
+    value.textContent = `${point.cumW}–${point.cumL}`;
+    const valueCaption = document.createElement("span");
+    valueCaption.className = "tt-caption";
+    valueCaption.textContent = " career record";
+    value.append(valueCaption);
+    node.append(value);
+
+    const detail = document.createElement("div");
+    detail.className = "tt-detail";
+    if (point.fight) {
+      detail.textContent = `${point.fight.result} (${point.fight.method}) vs ${point.fight.opponent}`;
+      const date = document.createElement("div");
+      date.className = "tt-date";
+      date.textContent = point.fight.date;
+      node.append(detail, date);
+    } else {
+      detail.textContent = "Professional debut ahead";
+      node.append(detail);
+    }
+
+    this.tooltip.style("opacity", 1);
+    const ttWidth = node.offsetWidth || 180;
+    const flip = event.pageX + 16 + ttWidth > window.innerWidth;
     this.tooltip
-      .style("opacity", 1)
-      .html(
-        `
-                <strong>${d.boxer}</strong><br/>
-                Fight ${d.x + 1}: vs ${d.fight.opponent}<br/>
-                Result: ${d.fight.result}<br/>
-                Method: ${d.fight.method}<br/>
-                Date: ${d.fight.date}<br/>
-                Cumulative: ${d.y > 0 ? "+" : ""}${d.y}
-            `
-      )
-      .style("left", event.pageX + 10 + "px")
-      .style("top", event.pageY - 10 + "px");
+      .style("left", (flip ? event.pageX - 16 - ttWidth : event.pageX + 16) + "px")
+      .style("top", event.pageY - 12 + "px");
   }
 
   hideTooltip() {
